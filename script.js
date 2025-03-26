@@ -12,7 +12,20 @@ const firebaseConfig = {
 
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+
+// Reference to the Realtime Database
+const db = firebase.database();
+
+// Sign in the user anonymously
+firebase.auth().onAuthStateChanged(user => {
+    if (user) {
+        console.log("Signed in as:", user.uid);
+    } else {
+        firebase.auth().signInAnonymously().catch(error => {
+            console.error("Authentication error:", error);
+        });
+    }
+});
 
 // Function to send a message
 function sendMessage() {
@@ -24,27 +37,24 @@ function sendMessage() {
         return;
     }
 
-    db.collection("messages").add({
-        username,
-        message,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    // Save message to Realtime Database
+    db.ref("messages").push({
+        username: username,
+        message: message,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
     });
 
     document.getElementById("message").value = "";
 }
 
 // Function to display messages in real-time
-db.collection("messages").orderBy("timestamp").onSnapshot(snapshot => {
+db.ref("messages").orderByChild("timestamp").on("child_added", snapshot => {
     let messagesDiv = document.getElementById("messages");
-    messagesDiv.innerHTML = "";
+    let msg = snapshot.val();
+    let isUser = msg.username === document.getElementById("username").value.trim(); // Check if current user
 
-    snapshot.forEach(doc => {
-        let msg = doc.data();
-        let isUser = msg.username === document.getElementById("username").value.trim(); // Check if current user
-
-        let messageClass = isUser ? "user-message" : "other-message";
-        messagesDiv.innerHTML += `<p class="message ${messageClass}"><strong>${msg.username}:</strong> ${msg.message}</p>`;
-    });
+    let messageClass = isUser ? "user-message" : "other-message";
+    messagesDiv.innerHTML += `<p class="message ${messageClass}"><strong>${msg.username}:</strong> ${msg.message}</p>`;
 
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 });
